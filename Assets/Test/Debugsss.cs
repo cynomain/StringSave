@@ -12,13 +12,13 @@ public class Debugsss : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        /*
+        
         StrSaveTest();
         WriteTest();
         Debug.LogError("TEST ERROR");
         Debug.LogWarning("TEST WARN");
         Debug.LogException(new Exception("Test exception"));
-        */
+       
         StringStorage ss11 = new StringStorage();
         //ss11.Set("testv1", 10);
         ss11.Set("testv2", 20);
@@ -42,10 +42,13 @@ public class Debugsss : MonoBehaviour
         ss.Set("testvec2", v2);
         Vector3 v3 = new Vector3(4f, 5f, 6f);
         ss.Set("testvec3", v3);
+        Quaternion q = new Quaternion(13f, 180f, 20f, 2f);
+        ss.Set("testq", q);
         short s = 2;
         ss.Set("testshort", s);
         TestClass tc = new TestClass("namaaa", 6, 13);
         ss.Set("testclass", tc);
+        ss.SetArray("testboolarr", new bool[] { true, false, false });
         ss.Set("testend", "END");
         string parsedtoString = StringSaveParser.StrStorageToText(ss);
         Debug.Log(parsedtoString);
@@ -63,9 +66,12 @@ public class Debugsss : MonoBehaviour
         Debug.Log(ssNew["testbool"].AsBool());
         Debug.Log(ssNew["testvec2"].AsVector2());
         Debug.Log(ssNew["testvec3"].AsVector3());
+        Debug.Log(ssNew["testq"].AsQuaternion());
         Debug.Log(ssNew["testshort"].AsShort());
         Debug.Log(ssNew["testclass"].AsTypeJSON<TestClass>());
         Debug.Log(ssNew["testend"].AsString());
+        Debug.Log(ssNew["testboolarr"].AsBoolArray().ToString());
+        
     }
 
     void WriteTest()
@@ -94,6 +100,7 @@ public class Debugsss : MonoBehaviour
         Debug.Log(ssFromFile["testbool"].AsBool());
         Debug.Log(ssFromFile["testvec2"].AsVector2());
         Debug.Log(ssFromFile["testvec3"].AsVector3());
+        Debug.Log(ssFromFile["testq"].AsQuaternion());
         Debug.Log(ssFromFile["testshort"].AsShort());
         Debug.Log(ssFromFile["testclass"].AsTypeJSON<TestClass>());
         Debug.Log(ssFromFile["testend"].AsString());
