@@ -28,6 +28,7 @@ public class Debugsss : MonoBehaviour
 
     void StrSaveTest()
     {
+        ss.SetFlag("testflag", 13);
         int i = 12121;
         ss.Set("testint", i);
         string str = "strerere";

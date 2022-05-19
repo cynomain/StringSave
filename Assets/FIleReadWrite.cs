@@ -146,8 +146,11 @@ public class FileReadWrite
 
     private static string DirectoryWithoutFile(string path)
     {
+        /*
         string[] strlist = path.Split('/');
-        string news = path.Replace(strlist[strlist.Length - 1], "");
+        string news = path.Replace(strlist[strlist.Length - 1], ""); 
         return news;
+        */
+        return Path.GetDirectoryName(path);
     }
 }

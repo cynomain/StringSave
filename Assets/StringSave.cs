@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -9,13 +10,13 @@ using _SSP = cynomain.StringSave.StringSaveParser;
 
 namespace cynomain.StringSave
 {
-
     [System.Serializable]
     public class StringStorage
     {
-        public const string HEADER = "$SSV";
+        public const string HEADER = "$";
         public const int SAVE_VERSION = 1;
 
+        public Dictionary<string, int> flags; 
         public Dictionary<string, string> database; //key value
 
         /// <summary>
@@ -24,12 +25,20 @@ namespace cynomain.StringSave
         /// <param name="formatted"></param>
         public StringStorage(string formatted)
         {
+            Reset();
             database = StringSaveParser.TextToStrStorage(formatted).database;
         }
 
         public StringStorage()
         {
+            Reset();
+        }
+
+        public void Reset()
+        {
             database = new Dictionary<string, string>();
+            flags = new Dictionary<string, int>();
+            SetFlag(_SSP.Flags.VERSION, SAVE_VERSION);            
         }
 
         public StringStorageObject this[string key]
@@ -64,6 +73,8 @@ namespace cynomain.StringSave
             }
         }
 
+        public void Add<T>(string key, T value) => Set(key, value);
+
         public void SetArray<TArray>(string key, TArray[] arrayvalue)
         {
             if (database.ContainsKey(key))
@@ -96,6 +107,51 @@ namespace cynomain.StringSave
             sso = Get(key);
             return sso != null;
         }
+
+        public void Remove(string key)
+        {
+            if (database.ContainsKey(key))
+            {
+                database.Remove(key);
+            }
+            else
+            {
+                Debug.LogWarning("[StringSave] Key " + key + " does not exist.");
+            }
+        }
+
+        public void SetFlag(string key, int value)
+        {
+            if (flags.ContainsKey(key))
+            {
+                flags[key] = value;
+            }
+            else
+            {
+                flags.Add(key, value);
+            }
+        }
+
+        public void AddFlag(string key, int value) => SetFlag(key, value);
+
+        public void RemoveFlag(string key)
+        {
+            if (flags.ContainsKey(key))
+            {
+                flags.Remove(key);
+            }
+            else
+            {
+                Debug.LogWarning("[StringSave] Flag " + key + " does not exist in flags.");
+            }
+        }
+
+        /*
+        public void SetEncryption(EncryptionType type)
+        {
+            SetFlag(_SSP.Flags.ENCRYPTION, (int)type);
+        }
+        */
 
         public StringStorageObject PrioritizeGet(params string[] keys)
         {
@@ -155,15 +211,35 @@ namespace cynomain.StringSave
                 throw;
             }
         }
+
+        public enum EncryptionType
+        {
+            None = 0,
+            XOR = 1
+        }
     }
 
     public class StringSaveParser
     {
+
         public static string StrStorageToText(StringStorage store)
         {
-            string header = $"$SSV:{StringStorage.SAVE_VERSION}\n";
-            string content = "";
-            StringBuilder sb = new StringBuilder(header);
+            StringBuilder sb = new StringBuilder(StringStorage.HEADER);
+            int flagsCount = 0;
+            foreach (var item in store.flags)
+            {
+                if (flagsCount >= store.flags.Count - 1)
+                {
+                    //End
+                    sb.Append($"{item.Key}:{item.Value}");
+                }
+                else
+                {
+                    sb.Append($"{item.Key}:{item.Value}|");
+                    flagsCount++;
+                }
+            }
+            sb.Append("\n");
             int count = 0;
             foreach (var item in store.database)
             {
@@ -179,8 +255,7 @@ namespace cynomain.StringSave
                 }
                 //Debug.Log(store.database.Count + " vs " + count);
             }
-            content = sb.ToString();
-            return content;
+            return sb.ToString();
         }
 
         public static StringStorage TextToStrStorage(string text)
@@ -193,10 +268,12 @@ namespace cynomain.StringSave
             }
             //string noEnter = Utils.RemoveEnter(text); //remove enter
             string[] divided = text.Split('\n'); //split \n 
-                string versionStr = divided[0]; //get firs one for versions
-                string versionStrnobr = versionStr.Replace("$", ""); //remove []
-                Utils.DictionaryPair ver = Utils.stringtodictionary(versionStrnobr, ':'); //strnobrackets to ver
-                int version = int.Parse(ver.value); //version
+                string flags = divided[0]; //get firs one for versions
+                string flagsnoheader = flags.Replace("$", ""); //remove []
+                Dictionary<string, string> flagsStrDict = Utils.stringToDictionaryStringsEx(flagsnoheader, '|', ':'); //strnobrackets to ver
+                Dictionary<string, int> flagsDict = Utils.StringDictToInt(flagsStrDict);
+                int version = flagsDict[Flags.VERSION]; //version
+                //StringStorage.EncryptionType encryptType = (StringStorage.EncryptionType)flagsDict[Flags.ENCRYPTION];
                 Debug.Log($"[StringSave] StringSave is parsing version ({version})");
             List<string> noVersion = divided.ToList();
             noVersion.RemoveAt(0); //remove version
@@ -210,6 +287,13 @@ namespace cynomain.StringSave
                     Debug.LogError($"[StringSave] UNKNOWN VERSION OF STRINGSAVE : {version}. Trying default ({StringStorage.SAVE_VERSION})");
                     return V1Parser.ParseFromText(noVersion.ToArray()); //DEFAULT
             }
+        }
+
+        public static class Flags
+        {
+            public const string VERSION = "SSV";
+            public const string ENCRYPTION = "SSENCRYPT";
+
         }
 
         public static class V1Parser
@@ -354,6 +438,28 @@ namespace cynomain.StringSave
                 }
                 */
                 return new DictionaryPair(sarr[0], sarr[1]);
+            }
+
+            public static Dictionary<string,string> stringToDictionaryStringsEx(string str, char separator, char equalchar)
+            {
+                Dictionary<string, string> dict = new Dictionary<string, string>();
+                string[] split = str.Split(separator);
+                for (int i = 0; i < split.Length; i++)
+                {
+                    string[] pairs = split[i].Split(equalchar);
+                    dict.Add(pairs[0], pairs[1]);
+                }
+                return dict;
+            }
+
+            public static Dictionary<string, int> StringDictToInt(Dictionary<string, string> dict)
+            {
+                Dictionary<string, int> dict2 = new();
+                foreach (var item in dict)
+                {
+                    dict2.Add(item.Key, int.Parse(item.Value));
+                }
+                return dict2;
             }
 
             public struct DictionaryPair
@@ -666,6 +772,85 @@ namespace cynomain.StringSave
         public override string ToString()
         {
             return value;
+        }
+    }
+
+    public static class StringSave
+    {
+        public static StringStorage Create()
+        {
+            return new StringStorage();
+        }
+
+        public static StringStorage Create(string formatted)
+        {
+            return new StringStorage(formatted);
+        }
+
+        public static bool SaveToFile(StringStorage ss, string path, bool saveToPersistentDataPath = false)
+        {
+            string path2 = path;
+            if (saveToPersistentDataPath)
+            {
+                path2 = Path.Combine(Application.persistentDataPath, path);
+            }
+
+            try
+            { 
+                string text = ss.ToString();
+                string nofile = Path.GetDirectoryName(path2);
+                if (!Directory.Exists(nofile))
+                {
+                    Debug.LogWarning("[StringSaveIO] Directory of path doesn't exist. Trying to create it");
+                    Directory.CreateDirectory(nofile);
+                    Debug.Log("[StringSaveIO] Directory created : " + nofile);
+                }
+                StreamWriter sw = new StreamWriter(path2, false);
+                sw.Write(text);
+                sw.Close();
+                Debug.Log("[StringSaveIO] Saved StringStorage to file " + path2);
+                return true;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("[StringSaveIO] Failed saving file : " + path + ". Exception: " + e.Message);
+                return false;
+            }
+        }
+
+        public static StringStorage ReadFromFile(string path)
+        {
+            try
+            {
+                return InternalReadFile(path);
+            }
+            catch (System.Exception)
+            {
+                Debug.LogError("[StringSaveIO] Failed reading file : " + path);
+                throw;
+            }
+        }
+
+        public static bool TryReadFromFile(string path, out StringStorage result)
+        {
+            try
+            {
+                result = InternalReadFile(path);
+                return true;
+            }
+            catch (System.Exception)
+            {
+                Debug.LogError("[StringSaveIO] Failed reading file : " + path);
+                result = null;
+                return false;
+            }
+        }
+
+        private static StringStorage InternalReadFile(string path)
+        {
+            StreamReader sr = new StreamReader(path);
+            string s = sr.ReadToEnd();
+            return new StringStorage(s);
         }
     }
 }
